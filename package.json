@@ -1,0 +1,33 @@
+{
+  "name": "claude-lint-changes",
+  "version": "0.1.0",
+  "description": "Claude Code hooks helper: journal changed files and lint on Stop (snippet→fallback).",
+  "type": "module",
+  "bin": {
+    "claude-lint-changes": "dist/cli.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "dev": "tsx src/cli.ts",
+    "build": "tsc -p tsconfig.json",
+    "prepare": "pnpm run build"
+  },
+  "engines": {
+    "node": ">=18.18"
+  },
+  "license": "MIT",
+  "author": "Your Name <you@example.com>",
+  "devDependencies": {
+    "@types/node": "^24.9.1",
+    "tsx": "^4.20.6"
+  },
+  "dependencies": {
+    "@typescript-eslint/eslint-plugin": "^8.46.2",
+    "@typescript-eslint/parser": "^8.46.2",
+    "diff": "^8.0.2",
+    "eslint": "^9.38.0",
+    "typescript": "^5.9.3"
+  }
+}
