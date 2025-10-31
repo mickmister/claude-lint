@@ -1,0 +1,29 @@
+{
+  "noEslintrc": true,
+  "rules": {
+    "@typescript-eslint/no-explicit-any": "error",
+    "no-var": "error",
+    "no-console": "warn",
+    "no-comments/disallowComments": [
+      "error",
+      {
+        "allow": [
+          "tip",
+          "eslint-disable-next-line",
+          "eslint-disable",
+          "@ts-ignore"
+        ]
+      }
+    ]
+  },
+  "typeAware": true,
+  "maxWarnings": 0,
+  "clearJournal": true,
+  "verbose": true,
+  "ruleGuidance": {
+    "@typescript-eslint/no-explicit-any": "- Prefer natural type inference when possible.\n- If you're blocked on the issue, use the \"I'm blocked\" MCP server to send me a message about the thing you're blocked on.\n- Let me know the scope of the TODO and if it should be done in the same effort.",
+    "no-var": "- Replace 'var' with 'const' for values that don't change, or 'let' for values that do.\n- Using const/let provides better scoping and prevents common bugs.",
+    "no-console": "- Remove console statements from production code.\n- Use proper logging utilities instead.\n- If needed for debugging, add a comment explaining why it must stay.",
+    "no-comments/disallowComments": "- If the comment is a todo, and you're blocked on the issue, use the \"I'm blocked\" MCP server to send me a message about the thing you're blocked on. Let me know the scope of the TODO and if it should be done in the same effort.\n- If the comment is meant to explain that you met the requirements of my ask, then simply remove the comment.\n- If the comment is providing clarity for the code and truly increases readability, leave a \"tip:\" at the beginning of the line of code."
+  }
+}
