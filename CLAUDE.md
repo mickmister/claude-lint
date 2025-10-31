@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-`claude-lint-changes` is a CLI tool designed specifically for Claude Code integration. It journals file changes during Edit/Write operations and runs ESLint only on changed lines during Stop events, implementing a "snippet-first → fallback to full-file (filtered to changed lines)" strategy.
+`claude-lint` is a CLI tool designed specifically for Claude Code integration. It journals file changes during Edit/Write operations and runs ESLint only on changed lines during Stop events, implementing a "snippet-first → fallback to full-file (filtered to changed lines)" strategy.
 
 ## Development Commands
 

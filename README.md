@@ -1,4 +1,4 @@
-# claude-lint-changes
+# claude-lint
 
 A Claude Code-friendly CLI to journal changed files during Edit/Write events and lint them once at Stop using ESLint.
 It implements a "snippet-first → fallback to full-file (filtered to changed lines)" strategy to keep TypeScript parsing robust.
@@ -52,7 +52,7 @@ Set the `CLAUDE_SESSION_ID` environment variable in your hooks to maintain consi
         "hooks": [
           {
             "type": "command",
-            "command": "CLAUDE_SESSION_ID=$CLAUDE_SESSION npx claude-lint-changes pre-cache",
+            "command": "CLAUDE_SESSION_ID=$CLAUDE_SESSION npx claude-lint pre-cache",
             "env": {"CLAUDE_SESSION_ID": "unique-session-id"}
           }
         ]
@@ -74,7 +74,7 @@ This ensures that:
       {
         "matcher": "Edit|Write|MultiEdit",
         "hooks": [
-          { "type": "command", "command": "npx claude-lint-changes pre-cache" }
+          { "type": "command", "command": "npx claude-lint pre-cache" }
         ]
       }
     ],
@@ -82,7 +82,7 @@ This ensures that:
       {
         "matcher": "Edit|Write|MultiEdit",
         "hooks": [
-          { "type": "command", "command": "npx claude-lint-changes record" }
+          { "type": "command", "command": "npx claude-lint record" }
         ]
       }
     ],
@@ -92,7 +92,7 @@ This ensures that:
         "hooks": [
           {
             "type": "command",
-            "command": "npx claude-lint-changes finalize --no-eslintrc --rules '@typescript-eslint/no-explicit-any:error,no-var:error' --type-aware --max-warnings 0 --clear-journal"
+            "command": "npx claude-lint finalize --no-eslintrc --rules '@typescript-eslint/no-explicit-any:error,no-var:error' --type-aware --max-warnings 0 --clear-journal"
           }
         ]
       }
@@ -102,10 +102,10 @@ This ensures that:
 
 ## Example usage
 pnpm dev help
-npx claude-lint-changes record --file src/example.ts --verbose
-npx claude-lint-changes pre-cache --file src/example.ts --verbose
-npx claude-lint-changes finalize --no-eslintrc --rules '@typescript-eslint/no-explicit-any:error,no-var:error' --type-aware --max-warnings 0 --guidance rule-guidance.json --verbose
-npx claude-lint-changes clear
+npx claude-lint record --file src/example.ts --verbose
+npx claude-lint pre-cache --file src/example.ts --verbose
+npx claude-lint finalize --no-eslintrc --rules '@typescript-eslint/no-explicit-any:error,no-var:error' --type-aware --max-warnings 0 --guidance rule-guidance.json --verbose
+npx claude-lint clear
 
 ## Rule Guidance
 Create a `rule-guidance.json` file to provide helpful context when rules are violated:

@@ -1,10 +1,10 @@
 {
-  "name": "claude-lint-changes",
-  "version": "0.1.5",
-  "description": "Claude Code hooks helper: journal changed files and lint on Stop (snippet→fallback).",
+  "name": "claude-lint",
+  "version": "0.1.7",
+  "description": "Claude Code hooks helper: journal changed files and lint on Stop.",
   "type": "module",
   "bin": {
-    "claude-lint-changes": "dist/src/cli.js"
+    "claude-lint": "dist/src/cli.js"
   },
   "files": [
     "dist"
@@ -16,7 +16,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:ui": "vitest --ui",
-    "publish:local": "npm publish --registry http://localhost:4873"
+    "publish:local": "npm publish --registry http://localhost:4873",
+    "publish": "npm publish"
+
   },
   "engines": {
     "node": ">=18.18"

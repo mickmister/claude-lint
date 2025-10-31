@@ -1,4 +1,4 @@
-// Test file for claude-lint-changes
+// Test file for claude-lint
 export function greet(name: string): string {
     return `Hello, ${name}!`;
 }

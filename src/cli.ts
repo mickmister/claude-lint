@@ -513,10 +513,10 @@ export async function cmdFinalize(flags: Flags) {
     }
 
     if (totalErrs > 0) {
-        console.error(`❌ Failed due to ${totalErrs} error(s)`);
+        console.error(`To Claude: Please clean up ${totalErrs} error(s)`);
         debugLog(`❌ Failed due to ${totalErrs} error(s)`, sessionId);
     } else if (totalWarns > maxWarnings) {
-        console.error(`❌ Failed: ${totalWarns} warning(s) exceeds max-warnings threshold of ${maxWarnings}`);
+        console.error(`To Claude: Please clean up ${totalWarns} warning(s) exceeds max-warnings threshold of ${maxWarnings}`);
         debugLog(`❌ Failed: ${totalWarns} warning(s) exceeds max-warnings threshold of ${maxWarnings}`, sessionId);
     } else {
         console.error(`✅ All checks passed`);
@@ -595,16 +595,16 @@ export async function cmdFinalize(flags: Flags) {
             return;
         }
         default:
-            console.log(`claude-lint-changes
+            console.log(`claude-lint
 
 Usage:
-  claude-lint-changes record [--file path] [--verbose]
+  claude-lint record [--file path] [--verbose]
       # Record a file change (or read Claude hook payload from stdin)
 
-  claude-lint-changes pre-cache [--file path] [--verbose]
+  claude-lint pre-cache [--file path] [--verbose]
       # Cache the pre-edit version of a file
 
-  claude-lint-changes finalize [options]
+  claude-lint finalize [options]
       Options:
         --config <path>       Load configuration from JSON file
         --no-eslintrc         Use inline config instead of .eslintrc
@@ -616,10 +616,10 @@ Usage:
         --verbose             Show detailed progress information
       Note: Command-line flags override config file settings
 
-  claude-lint-changes clear [--verbose]
+  claude-lint clear [--verbose]
       # Clear the journal and pre-cache for current session
 
-  claude-lint-changes clear-all [--verbose]
+  claude-lint clear-all [--verbose]
       # Clear ALL session caches (useful for cleanup)
 
 Session Management:
