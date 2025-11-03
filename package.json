@@ -1,6 +1,6 @@
 {
   "name": "claude-lint",
-  "version": "0.2.4",
+  "version": "0.2.6",
   "description": "Claude Code hooks helper: journal changed files and lint on Stop.",
   "type": "module",
   "main": "dist/index.js",

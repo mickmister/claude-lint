@@ -6,6 +6,7 @@
 
 export {
   defineLintConfig,
+  definePresetFunction,
   type LintConfig,
   type ValidatorConfig,
   type Rule,

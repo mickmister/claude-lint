@@ -107,3 +107,37 @@ export function defineLintConfig(config: Partial<LintConfig> & { validators: Val
     ...config
   };
 }
+
+/**
+ * Helper function to define a custom preset function with type safety and autocomplete.
+ * Use this in your custom preset files for better IDE support.
+ *
+ * @example
+ * ```typescript
+ * import { definePresetFunction } from 'claude-lint';
+ *
+ * export default definePresetFunction(async ({ changes, config, sessionId, cwd }) => {
+ *   const messages = [];
+ *   let errorCount = 0;
+ *
+ *   for (const change of changes) {
+ *     // Custom validation logic here
+ *     if (someCondition) {
+ *       messages.push({
+ *         file: change.filePath,
+ *         line: 1,
+ *         column: 1,
+ *         message: "Custom error message",
+ *         ruleId: "custom-rule"
+ *       });
+ *       errorCount++;
+ *     }
+ *   }
+ *
+ *   return { messages, errorCount };
+ * });
+ * ```
+ */
+export function definePresetFunction(fn: PresetFunction): PresetFunction {
+  return fn;
+}

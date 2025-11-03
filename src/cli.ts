@@ -286,8 +286,10 @@ export async function cmdRecord(flags: Flags) {
         try {
             file = JSON.parse(raw)?.tool_input?.file_path ?? "";
         } catch (err) {
-            logError(`Failed to parse stdin JSON: ${err instanceof Error ? err.message : err}`);
-            return;
+            const errorMsg = `Failed to parse stdin JSON in cmdRecord: ${err instanceof Error ? err.message : err}`;
+            debugLog(errorMsg, sessionId);
+            logError(errorMsg);
+            exit(1);
         }
     }
     if (!file) {
@@ -309,8 +311,10 @@ export async function cmdPreCache(flags: Flags) {
         try {
             file = JSON.parse(raw)?.tool_input?.file_path ?? "";
         } catch (err) {
-            logError(`Failed to parse stdin JSON: ${err instanceof Error ? err.message : err}`);
-            return;
+            const errorMsg = `Failed to parse stdin JSON in cmdPreCache: ${err instanceof Error ? err.message : err}`;
+            debugLog(errorMsg, sessionId);
+            logError(errorMsg);
+            exit(1);
         }
     }
     if (!file) {
@@ -434,14 +438,14 @@ export default defineLintConfig({
 
     // Create lint config if --customize flag is passed
     if (shouldCustomize) {
-    if (!fssync.existsSync(lintConfigPath)) {
-        ensureDirFor(lintConfigPath);
-        await fs.writeFile(lintConfigPath, lintConfigContent);
-        console.log(`✅ Created ${lintConfigPath} (extends default config)`);
-    } else {
-        console.log(`⚠️  ${lintConfigPath} already exists, skipping`);
-    }
-    console.log(`\nNext steps:
+        if (!fssync.existsSync(lintConfigPath)) {
+            ensureDirFor(lintConfigPath);
+            await fs.writeFile(lintConfigPath, lintConfigContent);
+            console.log(`✅ Created ${lintConfigPath} (extends default config)`);
+        } else {
+            console.log(`⚠️  ${lintConfigPath} already exists, skipping`);
+        }
+        console.log(`\nNext steps:
   1. Customize .claude/lint-config.mjs as needed
   2. See documentation: https://github.com/mickmister/claude-lint
 `);
