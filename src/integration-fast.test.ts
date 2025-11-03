@@ -50,7 +50,7 @@ describe("Fast CLI Integration Tests", () => {
 
             await cmdRecord({file: testFile});
 
-            const journalPath = `.claude/cache/sessions/${SESSION_ID}/changed/changed_files.txt`;
+            const journalPath = `.claude/.claude-lint/sessions/${SESSION_ID}/changed/changed_files.txt`;
             const content = await fs.readFile(journalPath, "utf8");
             expect(content).toContain(testFile);
         });
@@ -61,7 +61,7 @@ describe("Fast CLI Integration Tests", () => {
 
             await cmdRecord({file: mdFile});
 
-            const journalPath = `.claude/cache/sessions/${SESSION_ID}/changed/changed_files.txt`;
+            const journalPath = `.claude/.claude-lint/sessions/${SESSION_ID}/changed/changed_files.txt`;
             const content = await fs.readFile(journalPath, "utf8");
             expect(content).toContain(mdFile);
         });
@@ -75,7 +75,7 @@ describe("Fast CLI Integration Tests", () => {
 
             await cmdPreCache({file: testFile});
 
-            const cachePath = `.claude/cache/sessions/${SESSION_ID}/pre/${testFile}.bak`;
+            const cachePath = `.claude/.claude-lint/sessions/${SESSION_ID}/pre/${testFile}.bak`;
             const cachedContent = await fs.readFile(cachePath, "utf8");
             expect(cachedContent).toBe(content);
         });

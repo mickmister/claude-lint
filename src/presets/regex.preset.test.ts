@@ -35,11 +35,9 @@ describe('regexValidator', () => {
       file: 'test.js',
       line: 2,
       ruleId: 'no-todos',
-      severity: 'error',
       message: 'TODO comments not allowed'
     });
     expect(result.errorCount).toBe(1);
-    expect(result.warningCount).toBe(0);
   });
 
   it('should detect multiple patterns for same rule', async () => {
@@ -73,7 +71,7 @@ describe('regexValidator', () => {
     expect(result.errorCount).toBe(3);
   });
 
-  it('should respect severity levels', async () => {
+  it('should treat all violations as errors', async () => {
     const changes: FileChange[] = [{
       filePath: 'test.js',
       after: 'console.log("debug");',
@@ -89,7 +87,6 @@ describe('regexValidator', () => {
         files: ['**/*.js'],
         rules: [{
           name: 'no-console-log',
-          severity: 'warning',
           patterns: ['console\\.log\\('],
           message: 'Remove console.log'
         }]
@@ -100,12 +97,11 @@ describe('regexValidator', () => {
 
     const result = await regexValidator(context);
 
-    expect(result.messages[0].severity).toBe('warning');
-    expect(result.errorCount).toBe(0);
-    expect(result.warningCount).toBe(1);
+    expect(result.messages).toHaveLength(1);
+    expect(result.errorCount).toBe(1);
   });
 
-  it('should skip rules with severity "off"', async () => {
+  it('should skip rules with no patterns', async () => {
     const changes: FileChange[] = [{
       filePath: 'test.js',
       after: 'TODO: fix this',
@@ -121,8 +117,7 @@ describe('regexValidator', () => {
         files: ['**/*.js'],
         rules: [{
           name: 'no-todos',
-          severity: 'off',
-          patterns: ['\\bTODO\\b'],
+          patterns: [],
           message: 'TODO comments not allowed'
         }]
       },

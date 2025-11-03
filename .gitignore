@@ -1,7 +1,6 @@
 node_modules
 dist
 .DS_Store
-.claude/cache/*
-!/.claude/cache/.gitkeep
+.claude/.claude-lint
 coverage
 .test-temp*

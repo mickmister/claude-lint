@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "pnpm dev pre-cache"
+            "command": "pnpm dev"
           }
         ]
       }
@@ -17,7 +17,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "pnpm dev record"
+            "command": "pnpm dev"
           }
         ]
       }
@@ -28,7 +28,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "pnpm dev finalize --config .claude/new-lint-config.mjs"
+            "command": "pnpm dev"
           }
         ]
       }

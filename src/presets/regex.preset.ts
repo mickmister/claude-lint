@@ -25,7 +25,6 @@ export const regexValidator: PresetFunction = async (context) => {
 
     // Check each rule
     for (const rule of config.rules) {
-      if (rule.severity === 'off') continue;
       if (!rule.patterns || rule.patterns.length === 0) continue;
 
       // Check each pattern
@@ -44,8 +43,7 @@ export const regexValidator: PresetFunction = async (context) => {
               line: lineOffset + idx + 1,
               column: (match.index ?? 0) + 1,
               message: rule.message,
-              ruleId: rule.name,
-              severity: rule.severity as 'error' | 'warning'
+              ruleId: rule.name
             });
           }
         });
@@ -55,7 +53,6 @@ export const regexValidator: PresetFunction = async (context) => {
 
   return {
     messages,
-    errorCount: messages.filter(m => m.severity === 'error').length,
-    warningCount: messages.filter(m => m.severity === 'warning').length
+    errorCount: messages.length
   };
 };

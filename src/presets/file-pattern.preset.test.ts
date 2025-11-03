@@ -77,7 +77,6 @@ describe('filePatternValidator', () => {
       line: 1,
       column: 1,
       ruleId: 'markdown-organization',
-      severity: 'error',
       message: 'Markdown files must be in claude_notes/'
     });
     expect(result.errorCount).toBe(1);
@@ -296,7 +295,7 @@ describe('filePatternValidator', () => {
     expect(result.messages[1].ruleId).toBe('config-in-root');
   });
 
-  it('should skip rules with severity "off"', async () => {
+  it('should skip rules with no patterns', async () => {
     const changes: FileChange[] = [{
       filePath: 'notes.md',
       after: '# Notes',
@@ -312,8 +311,7 @@ describe('filePatternValidator', () => {
         files: ['**/*.md'],
         rules: [{
           name: 'markdown-organization',
-          severity: 'off',
-          patterns: ['**/*.md'],
+          patterns: [],
           allowed: ['claude_notes/**'],
           message: 'Markdown must be in claude_notes/'
         }]

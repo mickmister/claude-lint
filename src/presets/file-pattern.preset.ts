@@ -18,8 +18,6 @@ export const filePatternValidator: PresetFunction = async (context) => {
 
     // Check each rule
     for (const rule of config.rules) {
-      if (rule.severity === 'off') continue;
-
       // Check if file matches any of the rule's patterns
       const matchesPattern = (rule.patterns || []).some(p =>
         matchesGlob(change.filePath, [p])
@@ -49,8 +47,7 @@ export const filePatternValidator: PresetFunction = async (context) => {
           line: 1,
           column: 1,
           message: rule.message,
-          ruleId: rule.name,
-          severity: rule.severity as 'error' | 'warning'
+          ruleId: rule.name
         });
       }
     }
@@ -58,7 +55,6 @@ export const filePatternValidator: PresetFunction = async (context) => {
 
   return {
     messages,
-    errorCount: messages.filter(m => m.severity === 'error').length,
-    warningCount: messages.filter(m => m.severity === 'warning').length
+    errorCount: messages.length
   };
 };

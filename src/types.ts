@@ -13,6 +13,8 @@ export interface FileChange {
   after: string;
   ranges: Range[];
   snippet: string;
+  addedRanges?: Range[]; // Lines that are pure additions (no corresponding removal)
+  modifiedRanges?: Range[]; // Lines that are modifications (paired with removals)
 }
 
 export interface LintMessage {
@@ -21,12 +23,10 @@ export interface LintMessage {
   column: number;
   message: string;
   ruleId: string;
-  severity: "error" | "warning";
 }
 
 export interface Rule {
   name: string;
-  severity: "error" | "warning" | "off";
   patterns?: string[];
   allowed?: string[];
   message: string;
@@ -40,12 +40,11 @@ export interface ValidatorConfig {
   exclude?: string[];
   rules: Rule[];
   options?: Record<string, any>;
+  changeType?: "added" | "modified" | "all"; // Filter by type of change (default: "all")
 }
 
 export interface LintConfig {
   validators: ValidatorConfig[];
-  maxWarnings: number;
-  clearJournal: boolean;
   verbose: boolean;
   debug?: boolean;
 }
@@ -53,7 +52,6 @@ export interface LintConfig {
 export interface PresetResult {
   messages: LintMessage[];
   errorCount: number;
-  warningCount: number;
 }
 
 export interface PresetContext {
@@ -95,19 +93,15 @@ export class ExitCodeError extends Error {
  *     files: ["**\/*.ts"],
  *     rules: [{
  *       name: "no-var",
- *       severity: "error",
  *       patterns: ["\\bvar\\s"],
  *       message: "Use const or let instead of var"
  *     }]
- *   }],
- *   maxWarnings: 0
+ *   }]
  * });
  * ```
  */
 export function defineLintConfig(config: Partial<LintConfig> & { validators: ValidatorConfig[] }): LintConfig {
   return {
-    maxWarnings: 0,
-    clearJournal: true,
     verbose: false,
     debug: false,
     ...config
