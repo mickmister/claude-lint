@@ -1,12 +1,13 @@
-import {defineLintConfig} from '../dist';
+import {defineLintConfig} from '../dist/index.js';
 
-import defaultConfig, {noCommentsRule, noCommentsRuleBash} from '../dist/lint-config.default.mjs';
+import defaultConfig, {
+  extraValidators,
+} from '../dist/lint-config.default.mjs';
 
 export default defineLintConfig({
   validators: [
     ...defaultConfig.validators,
-    noCommentsRule,
-    noCommentsRuleBash,
+    ...extraValidators,
   ],
   debug: true,
 });

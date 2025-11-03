@@ -62,8 +62,6 @@ async function getSessionId(): Promise<string> {
                 debugLog(`getSessionId: parsed stdin payload: ${JSON.stringify(payloadSummary)}`, CACHED_SESSION_ID);
                 if (payload.session_id) {
                     CACHED_SESSION_ID = payload.session_id;
-                    // Debug: Print the session ID when it's first cached
-                    console.error('DEBUG LOG: ' + CACHED_SESSION_ID);
                     debugLog(`getSessionId: cached session_id from stdin: ${CACHED_SESSION_ID}`, CACHED_SESSION_ID);
                     return CACHED_SESSION_ID!;
                 }
@@ -200,6 +198,9 @@ async function runValidators(
     let totalErrors = 0;
 
     for (const validator of validators) {
+        if (!validator.preset) {
+            throw new Error(`Validator is missing required 'preset' field: ${JSON.stringify(validator)}`);
+        }
         const preset = await loadPreset(validator.preset);
         const result = await preset({ changes, config: validator, sessionId, cwd });
 
@@ -326,9 +327,10 @@ export async function cmdPreCache(flags: Flags) {
     await fs.copyFile(file, cachePath);
 }
 
-export async function cmdInit() {
+export async function cmdInit(flags: Flags = {}) {
     const settingsPath = ".claude/settings.json";
     const lintConfigPath = ".claude/lint-config.mjs";
+    const shouldCustomize = flags.customize === true || flags.customize === "true";
 
     // Hook configuration to be added
     const hooksConfig = {
@@ -430,7 +432,8 @@ export default defineLintConfig({
         console.log(`✅ Created ${settingsPath} with claude-lint hooks`);
     }
 
-    // Create lint config if it doesn't exist
+    // Create lint config if --customize flag is passed
+    if (shouldCustomize) {
     if (!fssync.existsSync(lintConfigPath)) {
         ensureDirFor(lintConfigPath);
         await fs.writeFile(lintConfigPath, lintConfigContent);
@@ -438,11 +441,17 @@ export default defineLintConfig({
     } else {
         console.log(`⚠️  ${lintConfigPath} already exists, skipping`);
     }
-
     console.log(`\nNext steps:
   1. Customize .claude/lint-config.mjs as needed
   2. See documentation: https://github.com/mickmister/claude-lint
 `);
+    } else {
+        console.log(`\nSetup complete! Using default rules.
+
+To customize rules, run: npx claude-lint init --customize
+See documentation: https://github.com/mickmister/claude-lint
+`);
+    }
 }
 
 export async function cmdFinalize(flags: Flags) {
@@ -486,6 +495,44 @@ export async function cmdFinalize(flags: Flags) {
         log(`Using default config`);
         config = defaultConfig;
         configFile = "(default)";
+    }
+
+    // Validate config structure
+    const errorLogPath = '.claude/.claude-lint/error.log';
+    const debugInfo = [
+        `[${new Date().toISOString()}] Config validation debug:`,
+        `  Config file: ${configFile}`,
+        `  Config type: ${typeof config}`,
+        `  Config keys: ${config ? Object.keys(config).join(', ') : 'null'}`,
+        `  Has validators: ${!!config?.validators}`,
+        `  Validators is array: ${Array.isArray(config?.validators)}`,
+        `  Config: ${JSON.stringify(config, null, 2)}`,
+        ''
+    ].join('\n');
+
+    try {
+        fssync.appendFileSync(errorLogPath, debugInfo);
+    } catch (e) {
+        // Ignore errors writing debug info
+    }
+
+    if (!config.validators || !Array.isArray(config.validators)) {
+        throw new Error(`Invalid config: 'validators' must be an array. Config file: ${configFile}, type: ${typeof config?.validators}`);
+    }
+    for (let i = 0; i < config.validators.length; i++) {
+        const validator = config.validators[i];
+        if (!validator.preset) {
+            throw new Error(`Invalid config: validator at index ${i} is missing required 'preset' field. Validator: ${JSON.stringify(validator)}`);
+        }
+        if (!validator.scope) {
+            throw new Error(`Invalid config: validator at index ${i} is missing required 'scope' field`);
+        }
+        if (!validator.files || !Array.isArray(validator.files)) {
+            throw new Error(`Invalid config: validator at index ${i} is missing required 'files' array`);
+        }
+        if (!validator.rules || !Array.isArray(validator.rules)) {
+            throw new Error(`Invalid config: validator at index ${i} is missing required 'rules' array`);
+        }
     }
 
     // Enable debug logging if configured
@@ -588,7 +635,7 @@ export async function cmdFinalize(flags: Flags) {
 
     switch (command) {
         case "init":
-            await cmdInit();
+            await cmdInit(flags);
             return;
         case "PreToolUse":
         case "pre-cache":
