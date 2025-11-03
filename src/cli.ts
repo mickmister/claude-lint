@@ -497,25 +497,6 @@ export async function cmdFinalize(flags: Flags) {
         configFile = "(default)";
     }
 
-    // Validate config structure
-    const errorLogPath = '.claude/.claude-lint/error.log';
-    const debugInfo = [
-        `[${new Date().toISOString()}] Config validation debug:`,
-        `  Config file: ${configFile}`,
-        `  Config type: ${typeof config}`,
-        `  Config keys: ${config ? Object.keys(config).join(', ') : 'null'}`,
-        `  Has validators: ${!!config?.validators}`,
-        `  Validators is array: ${Array.isArray(config?.validators)}`,
-        `  Config: ${JSON.stringify(config, null, 2)}`,
-        ''
-    ].join('\n');
-
-    try {
-        fssync.appendFileSync(errorLogPath, debugInfo);
-    } catch (e) {
-        // Ignore errors writing debug info
-    }
-
     if (!config.validators || !Array.isArray(config.validators)) {
         throw new Error(`Invalid config: 'validators' must be an array. Config file: ${configFile}, type: ${typeof config?.validators}`);
     }
@@ -565,8 +546,13 @@ export async function cmdFinalize(flags: Flags) {
     const result = await runValidators(config!.validators, changes, sessionId, process.cwd());
 
     // 4. Display results
+    const cwd = process.cwd();
     for (const msg of result.messages) {
-        console.error(`${msg.file}:${msg.line}:${msg.column}  ${msg.message}  (${msg.ruleId})`);
+        // Convert absolute path to relative path
+        const displayPath = path.isAbsolute(msg.file)
+            ? path.relative(cwd, msg.file)
+            : msg.file;
+        console.error(`${displayPath}:${msg.line}:${msg.column}  ${msg.message}  (${msg.ruleId})`);
     }
 
     // 5. Summary
