@@ -28,7 +28,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "pnpm dev finalize --config .claude/lint-config.json"
+            "command": "pnpm dev finalize --config .claude/new-lint-config.mjs"
           }
         ]
       }

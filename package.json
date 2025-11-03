@@ -1,10 +1,18 @@
 {
   "name": "claude-lint",
-  "version": "0.1.7",
+  "version": "0.2.0",
   "description": "Claude Code hooks helper: journal changed files and lint on Stop.",
   "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
   "bin": {
-    "claude-lint": "dist/src/cli.js"
+    "claude-lint": "dist/cli.js"
   },
   "files": [
     "dist"
@@ -16,9 +24,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:ui": "vitest --ui",
-    "publish:local": "npm publish --registry http://localhost:4873",
-    "publish": "npm publish"
-
+    "test:coverage": "vitest run --coverage",
+    "test:coverage:ui": "vitest --ui --coverage",
+    "publish:local": "npm publish --registry http://localhost:4873"
   },
   "engines": {
     "node": ">=18.18"
@@ -28,6 +36,7 @@
   "devDependencies": {
     "@types/eslint": "^8.56.12",
     "@types/node": "^24.9.1",
+    "@vitest/coverage-v8": "^4.0.6",
     "@vitest/ui": "^4.0.4",
     "tsx": "^4.20.6",
     "vitest": "^4.0.4"
@@ -38,6 +47,7 @@
     "diff": "^8.0.2",
     "eslint": "^8.57.1",
     "eslint-plugin-no-comments": "^1.1.8",
+    "minimatch": "^10.0.1",
     "typescript": "^5.9.3"
   }
 }

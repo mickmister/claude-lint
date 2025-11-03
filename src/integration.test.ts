@@ -34,14 +34,14 @@ describe("CLI Integration Tests", () => {
             expect(content).toContain(testFile);
         });
 
-        it("should only record web files", async () => {
+        it("should record all files (validators decide what to process)", async () => {
             const mdFile = "readme.md";
             await fs.writeFile(mdFile, "# Test");
 
             execSync(`tsx ${CLI_PATH} record --file ${mdFile}`, {encoding: "utf8"});
 
-            const journalExists = fssync.existsSync(JOURNAL);
-            expect(journalExists).toBe(false);
+            const content = await fs.readFile(JOURNAL, "utf8");
+            expect(content).toContain(mdFile);
         });
 
         it("should append multiple files to journal", async () => {
@@ -89,15 +89,15 @@ describe("CLI Integration Tests", () => {
             expect(exists).toBe(false);
         });
 
-        it("should not cache non-web files", async () => {
+        it("should cache all files (validators decide what to process)", async () => {
             const mdFile = "readme.md";
             await fs.writeFile(mdFile, "# Test");
 
             execSync(`tsx ${CLI_PATH} pre-cache --file ${mdFile}`, {encoding: "utf8"});
 
             const cachePath = path.join(PRECACHE_ROOT, `${mdFile}.bak`);
-            const exists = fssync.existsSync(cachePath);
-            expect(exists).toBe(false);
+            const cachedContent = await fs.readFile(cachePath, "utf8");
+            expect(cachedContent).toBe("# Test");
         });
 
         it("should parse file from stdin JSON", async () => {
@@ -143,24 +143,59 @@ describe("CLI Integration Tests", () => {
         });
 
         it("should lint new files", async () => {
+            const config = `export default {
+                validators: [{
+                    preset: "regex",
+                    scope: "changes-only",
+                    files: ["**/*.js"],
+                    rules: [{
+                        name: "no-var",
+                        severity: "error",
+                        patterns: ["\\\\bvar\\\\s"],
+                        message: "Use const or let instead of var"
+                    }]
+                }],
+                maxWarnings: 0
+            };`;
+            await fs.mkdir(".claude", {recursive: true});
+            await fs.writeFile(".claude/lint-config.mjs", config);
+
             const testFile = "test.js";
             await fs.writeFile(testFile, "var x = 1;\n");
             execSync(`tsx ${CLI_PATH} record --file ${testFile}`, {encoding: "utf8"});
 
             try {
                 execSync(
-                    `tsx ${CLI_PATH} finalize --no-eslintrc --rules "no-var:error"`,
-                    {encoding: "utf8", stdio: ["pipe", "pipe", "pipe"]}
+                    `tsx ${CLI_PATH} finalize --config .claude/lint-config.mjs`,
+                    {encoding: "utf8"}
                 );
                 throw new Error("Expected finalize to fail with errors");
             } catch (err: any) {
-                const stderr = err.stderr?.toString() || "";
-                expect(stderr).toContain("no-var");
+                // stderr is captured in err.stderr (converted to string by encoding option)
+                const output = err.stderr || "";
+                expect(output).toContain("no-var");
                 expect(err.status).toBe(2);
             }
         });
 
         it("should only lint changed lines when pre-cache exists", async () => {
+            const config = `export default {
+                validators: [{
+                    preset: "regex",
+                    scope: "changes-only",
+                    files: ["**/*.js"],
+                    rules: [{
+                        name: "no-var",
+                        severity: "error",
+                        patterns: ["\\\\bvar\\\\s"],
+                        message: "Use const or let instead of var"
+                    }]
+                }],
+                maxWarnings: 0
+            };`;
+            await fs.mkdir(".claude", {recursive: true});
+            await fs.writeFile(".claude/lint-config.mjs", config);
+
             const testFile = "test.js";
             const before = "const x = 1;\n";
             const after = "const x = 1;\nvar y = 2;\n";
@@ -173,19 +208,24 @@ describe("CLI Integration Tests", () => {
 
             try {
                 execSync(
-                    `tsx ${CLI_PATH} finalize --no-eslintrc --rules "no-var:error"`,
-                    {encoding: "utf8", stdio: ["pipe", "pipe", "pipe"]}
+                    `tsx ${CLI_PATH} finalize --config .claude/lint-config.mjs`,
+                    {encoding: "utf8"}
                 );
                 throw new Error("Expected finalize to fail with errors");
             } catch (err: any) {
-                const stderr = err.stderr?.toString() || "";
+                // stderr is captured in err.stderr (converted to string by encoding option)
+                const output = err.stderr || "";
                 // Should find error in added line
-                expect(stderr).toContain("no-var");
+                expect(output).toContain("no-var");
                 expect(err.status).toBe(2);
             }
         });
 
         it("should clear journal when --clear-journal is set", async () => {
+            const config = `module.exports = { validators: [], maxWarnings: 0 };`;
+            await fs.mkdir(".claude", {recursive: true});
+            await fs.writeFile(".claude/lint-config.js", config);
+
             const testFile = "test.js";
             await fs.writeFile(testFile, "const x = 1;\n");
             execSync(`tsx ${CLI_PATH} record --file ${testFile}`, {encoding: "utf8"});
@@ -194,7 +234,7 @@ describe("CLI Integration Tests", () => {
             expect(fssync.existsSync(JOURNAL)).toBe(true);
 
             const result = execSync(
-                `tsx ${CLI_PATH} finalize --no-eslintrc --clear-journal 2>&1`,
+                `tsx ${CLI_PATH} finalize --clear-journal 2>&1`,
                 {encoding: "utf8"}
             );
 
@@ -208,27 +248,43 @@ describe("CLI Integration Tests", () => {
             await fs.writeFile(testFile, "var x = 1;\n");
             execSync(`tsx ${CLI_PATH} record --file ${testFile}`, {encoding: "utf8"});
 
-            const config = {
-                noEslintrc: true,
-                rules: {"no-var": "error"},
-            };
-            await fs.writeFile("lint-config.json", JSON.stringify(config));
+            const config = `export default {
+                validators: [{
+                    preset: "regex",
+                    scope: "changes-only",
+                    files: ["**/*.js"],
+                    rules: [{
+                        name: "no-var",
+                        severity: "error",
+                        patterns: ["\\\\bvar\\\\s"],
+                        message: "Use const or let instead of var"
+                    }]
+                }],
+                maxWarnings: 0
+            };`;
+            await fs.mkdir(".claude", {recursive: true});
+            await fs.writeFile(".claude/lint-config.mjs", config);
 
             try {
                 execSync(
-                    `tsx ${CLI_PATH} finalize --config lint-config.json`,
-                    {encoding: "utf8", stdio: ["pipe", "pipe", "pipe"]}
+                    `tsx ${CLI_PATH} finalize --config .claude/lint-config.mjs`,
+                    {encoding: "utf8"}
                 );
                 throw new Error("Expected finalize to fail with errors");
             } catch (err: any) {
-                const stderr = err.stderr?.toString() || "";
-                expect(stderr).toContain("no-var");
+                // stderr is captured in err.stderr (converted to string by encoding option)
+                const output = err.stderr || "";
+                expect(output).toContain("no-var");
                 expect(err.status).toBe(2);
             }
         });
 
         it("should handle no files gracefully", async () => {
-            const result = execSync(`tsx ${CLI_PATH} finalize --no-eslintrc --verbose`, {
+            const config = `module.exports = { validators: [], maxWarnings: 0 };`;
+            await fs.mkdir(".claude", {recursive: true});
+            await fs.writeFile(".claude/lint-config.js", config);
+
+            const result = execSync(`tsx ${CLI_PATH} finalize --verbose`, {
                 encoding: "utf8",
                 stdio: ["pipe", "pipe", "pipe"],
             });

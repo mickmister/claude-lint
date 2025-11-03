@@ -3,3 +3,5 @@ dist
 .DS_Store
 .claude/cache/*
 !/.claude/cache/.gitkeep
+coverage
+.test-temp*

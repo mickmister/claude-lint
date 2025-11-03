@@ -4,14 +4,19 @@ import fs from "node:fs/promises";
 import fssync from "node:fs";
 import path from "node:path";
 import process from "node:process";
-import {diffLines} from "diff";
-import {ESLint} from "eslint";
-import {createRequire} from "node:module";
+import { regexValidator } from "./presets/regex.preset.js";
+import { filePatternValidator } from "./presets/file-pattern.preset.js";
+import { computeAdded, matchesGlob, uniq } from "./utils.js";
+import type { LintConfig, FileChange, LintMessage, ValidatorConfig, PresetFunction } from "./types.js";
 
-const require = createRequire(import.meta.url);
+// Global flag to control debug logging (set after config is loaded)
+let DEBUG_ENABLED = false;
 
 // Debug logging to file - writes to session-specific or startup log
 function debugLog(message: string, sessionId: string | null) {
+    if (!DEBUG_ENABLED) {
+        return;
+    }
     try {
         const timestamp = new Date().toISOString();
         const logMessage = `[${timestamp}] ${message}\n`;
@@ -83,19 +88,6 @@ function getSessionPaths(sessionId: string) {
     };
 }
 
-type Config = {
-    noEslintrc?: boolean;
-    rules?: RulesRecord;
-    typeAware?: boolean;
-    maxWarnings?: number;
-    clearJournal?: boolean;
-    verbose?: boolean;
-    ruleGuidance?: Record<string, string>;
-}
-
-type RulesRecord = NonNullable<NonNullable<NonNullable<ConstructorParameters<typeof ESLint>[0]>['overrideConfig']>['rules']>;
-type RuleEntry = RulesRecord[string];
-
 export type Flags = Record<string, string | boolean>;
 export function parseArgs(argv: string[]) {
     const [, , sub = "help", ...rest] = argv;
@@ -143,140 +135,11 @@ async function readStdin(): Promise<string> {
     return Buffer.concat(chunks).toString("utf8");
 }
 
-export function isWebFile(p: string) {return /\.(?:[jt]s|[jt]sx)$/.test(p);}
-export function virtFromReal(p: string) {
-    if (p.endsWith(".tsx")) return "snippet.tsx";
-    if (p.endsWith(".ts")) return "snippet.ts";
-    if (p.endsWith(".jsx")) return "snippet.jsx";
-    return "snippet.js";
-}
-export function uniq<T>(xs: T[]) {return Array.from(new Set(xs));}
 function ensureDirFor(filePath: string) {
     fssync.mkdirSync(path.dirname(filePath), {recursive: true});
 }
-export function parseRulesCsv(csv?: string) {
-    const out: RulesRecord = {};
-    if (!csv) return out;
-
-    // Split by commas, but be careful with JSON arrays
-    const specs: string[] = [];
-    let current = "";
-    let depth = 0;
-    let inString = false;
-
-    for (let i = 0; i < csv.length; i++) {
-        const char = csv[i];
-        if (char === '"' && (i === 0 || csv[i - 1] !== '\\')) {
-            inString = !inString;
-        }
-        if (!inString) {
-            if (char === '[' || char === '{') depth++;
-            if (char === ']' || char === '}') depth--;
-        }
-        if (char === ',' && depth === 0 && !inString) {
-            specs.push(current.trim());
-            current = "";
-        } else {
-            current += char;
-        }
-    }
-    if (current.trim()) specs.push(current.trim());
-
-    for (const spec of specs) {
-        const s = spec.trim(); if (!s) continue;
-        const i = s.indexOf(":"); if (i <= 0) continue;
-        const id = s.slice(0, i).trim();
-        const valueRaw = s.slice(i + 1).trim();
-
-        // Try to parse as JSON first (for array/object configs)
-        let value: RuleEntry;
-        try {
-            value = JSON.parse(valueRaw);
-        } catch {
-            // Fall back to simple string parsing
-            const lvlRaw = valueRaw.toLowerCase() as NonNullable<RuleEntry>;
-            value = lvlRaw === "error" ? 2 : lvlRaw === "warn" ? 1 : Number.isFinite(+lvlRaw) ? (+lvlRaw as RuleEntry) : (valueRaw as RuleEntry);
-        }
-        out[id] = value;
-    }
-    return out;
-}
-
-function buildESLint(cwd: string, realFile: string, virt: string, opts: {
-    noEslintrc?: boolean;
-    rules?: RulesRecord;
-    typeAware?: boolean;
-}) {
-    const baseRules = opts.rules || {};
-    const isTS = /\.tsx?$/.test(realFile) || /\.tsx?$/.test(virt);
-
-    let parserOptions: Record<string, string> | undefined = undefined;
-    if (opts.typeAware) {
-        const tsconfigPath = path.join(cwd, "tsconfig.json");
-        if (fssync.existsSync(tsconfigPath)) {
-            try {
-                JSON.parse(fssync.readFileSync(tsconfigPath, "utf8"));
-                parserOptions = {project: "tsconfig.json"};
-                log("Using type-aware linting with tsconfig.json");
-            } catch (err) {
-                logError(`Warning: tsconfig.json exists but is invalid JSON: ${err instanceof Error ? err.message : err}`);
-                logError("Falling back to non-type-aware linting");
-            }
-        } else {
-            log("Type-aware linting requested but tsconfig.json not found");
-        }
-    }
-
-    const overrideConfig = opts.noEslintrc ? {
-        env: {
-            es2022: true,
-            node: true,
-        },
-        parserOptions: {
-            ecmaVersion: 2022 as const,
-            sourceType: "module" as const,
-            ...(isTS && parserOptions ? parserOptions : {}),
-        },
-        parser: isTS ? require.resolve("@typescript-eslint/parser") : undefined,
-        plugins: isTS ? ["@typescript-eslint", "no-comments"] : ["no-comments"],
-        rules: baseRules,
-    } : undefined;
-
-    return new ESLint({
-        useEslintrc: !opts.noEslintrc,
-        resolvePluginsRelativeTo: cwd,
-        overrideConfig,
-        ignore: !opts.noEslintrc
-    });
-}
 
 export type Range = {start: number; end: number};
-export function computeAdded(before: string, after: string) {
-    const parts = diffLines(before, after);
-    const ranges: Range[] = [];
-    let afterLine = 1;
-    const snippetPieces: string[] = [];
-    for (const p of parts) {
-        const lines = p.value.split(/\r?\n/);
-        const count = lines[lines.length - 1] === "" ? lines.length - 1 : lines.length;
-        if (p.added) {
-            const s = afterLine, e = afterLine + count - 1;
-            if (count > 0) {
-                ranges.push({start: s, end: e});
-                snippetPieces.push(p.value.replace(/\r?\n$/, ""));
-            }
-            afterLine += count;
-        } else if (p.removed) {
-            // no advance
-        } else {
-            afterLine += count;
-        }
-    }
-    return {ranges, snippet: snippetPieces.join("\n")};
-}
-export function inRanges(line: number, ranges: Range[]) {
-    return ranges.some(r => line >= r.start && line <= r.end);
-}
 
 let SHOULD_THROW_ON_EXIT = false;
 
@@ -292,6 +155,96 @@ export function resetSessionCache() {
     CACHED_STDIN_DATA = null;
     INJECTED_STDIN_DATA = null;
     SHOULD_THROW_ON_EXIT = false;
+}
+
+// Preset loader - maps preset name to function
+const BUILTIN_PRESETS: Record<string, PresetFunction> = {
+    "regex": regexValidator,
+    "file-pattern": filePatternValidator
+};
+
+async function loadPreset(presetPath: string): Promise<PresetFunction> {
+    // Built-in preset
+    if (BUILTIN_PRESETS[presetPath]) {
+        return BUILTIN_PRESETS[presetPath];
+    }
+
+    // Custom preset (file path)
+    if (presetPath.startsWith("./") || presetPath.startsWith("/")) {
+        const imported = await import(path.resolve(presetPath));
+        return imported.default || imported.validator;
+    }
+
+    throw new Error(`Unknown preset: ${presetPath}`);
+}
+
+// Run all validators and aggregate results
+async function runValidators(
+    validators: ValidatorConfig[],
+    changes: FileChange[],
+    sessionId: string,
+    cwd: string
+): Promise<{ messages: LintMessage[], errorCount: number, warningCount: number }> {
+    const allMessages: LintMessage[] = [];
+    let totalErrors = 0;
+    let totalWarnings = 0;
+
+    for (const validator of validators) {
+        const preset = await loadPreset(validator.preset);
+        const result = await preset({ changes, config: validator, sessionId, cwd });
+
+        allMessages.push(...result.messages);
+        totalErrors += result.errorCount;
+        totalWarnings += result.warningCount;
+    }
+
+    return {
+        messages: allMessages,
+        errorCount: totalErrors,
+        warningCount: totalWarnings
+    };
+}
+
+// Load file changes from journal
+async function loadFileChanges(files: string[], sessionId: string): Promise<FileChange[]> {
+    const paths = getSessionPaths(sessionId);
+    const changes: FileChange[] = [];
+
+    for (const file of files) {
+        const beforePath = path.join(paths.precache, `${file}.bak`);
+        const hasBefore = fssync.existsSync(beforePath);
+        const afterExists = fssync.existsSync(file);
+
+        if (!afterExists) {
+            log(`Skipping (file deleted): ${file}`);
+            continue;
+        }
+
+        const after = await fs.readFile(file, "utf8");
+
+        if (hasBefore) {
+            const before = await fs.readFile(beforePath, "utf8");
+            const { ranges, snippet } = computeAdded(before, after);
+
+            changes.push({
+                filePath: file,
+                before,
+                after,
+                ranges,
+                snippet
+            });
+        } else {
+            // New file - entire file is "changed"
+            changes.push({
+                filePath: file,
+                after,
+                ranges: [{ start: 1, end: after.split('\n').length }],
+                snippet: after
+            });
+        }
+    }
+
+    return changes;
 }
 
 export function setTestStdinData(data: string) {
@@ -323,8 +276,8 @@ export async function cmdRecord(flags: Flags) {
             return;
         }
     }
-    if (!file || !isWebFile(file)) {
-        log(`Skipping file (not a web file): ${file || "(empty)"}`);
+    if (!file) {
+        log(`Skipping file (empty file path)`);
         return;
     }
     log(`Recording file: ${file}${sessionId ? ` (session: ${sessionId})` : ""}`);
@@ -346,8 +299,8 @@ export async function cmdPreCache(flags: Flags) {
             return;
         }
     }
-    if (!file || !isWebFile(file)) {
-        log(`Skipping file (not a web file): ${file || "(empty)"}`);
+    if (!file) {
+        log(`Skipping file (empty file path)`);
         return;
     }
     if (!fssync.existsSync(file)) {
@@ -364,34 +317,35 @@ export async function cmdFinalize(flags: Flags) {
     const sessionId = await getSessionId();
     const paths = getSessionPaths(sessionId);
 
-    let config: Config = {};
+    // 1. Load config
+    const configFile = (flags.config as string) || ".claude/lint-config.js";
+    let config: LintConfig;
 
-    const configFile = (flags.config as string) || "";
-    if (configFile && fssync.existsSync(configFile)) {
-        try {
+    try {
+        if (configFile.endsWith('.js') || configFile.endsWith('.mjs')) {
+            // Dynamic import for .js/.mjs config (ESM)
+            const configModule = await import(path.resolve(configFile));
+            config = configModule.default || configModule;
+        } else {
+            // JSON config (legacy)
             const configData = JSON.parse(await fs.readFile(configFile, "utf8"));
             config = configData;
-            log(`Loaded config from ${configFile}`);
-        } catch (err) {
-            logError(`Failed to load config file: ${err instanceof Error ? err.message : err}`);
         }
+        log(`Loaded config from ${configFile}`);
+    } catch (err) {
+        logError(`Failed to load config file: ${err instanceof Error ? err.message : err}`);
+        logError(`Using empty config`);
+        config = { validators: [], maxWarnings: 0, clearJournal: false, verbose: false };
     }
 
-    // Command-line flags override config file
-    const noEslintrc = flags["no-eslintrc"] !== undefined ? !!flags["no-eslintrc"] : (config.noEslintrc ?? false);
-    const rulesCsv = (flags.rules as string) || "";
-    const typeAware = flags["type-aware"] !== undefined ? !!flags["type-aware"] : (config.typeAware ?? false);
-    const maxWarnings = flags["max-warnings"] !== undefined ? Number(flags["max-warnings"]) : (config.maxWarnings ?? 0);
-    const clearJournal = flags["clear-journal"] !== undefined ? !!flags["clear-journal"] : (config.clearJournal ?? false);
-    const guidanceFile = (flags.guidance as string) || "";
+    // Enable debug logging if configured
+    DEBUG_ENABLED = config.debug ?? false;
 
-    // Use rules from config if not provided via CSV
-    const baseRules = rulesCsv ? parseRulesCsv(rulesCsv) : (config.rules || {});
-
+    // 2. Read journal and load file changes
     let files: string[] = [];
     try {
         const txt = await fs.readFile(paths.journal, "utf8");
-        files = uniq(txt.split("\n").map(s => s.trim()).filter(Boolean).filter(isWebFile));
+        files = uniq(txt.split("\n").map(s => s.trim()).filter(Boolean));
     } catch (err) {
         log(`No journal file found or unable to read: ${err instanceof Error ? err.message : err}`);
     }
@@ -401,128 +355,42 @@ export async function cmdFinalize(flags: Flags) {
         return;
     }
 
-    let ruleGuidance: Record<string, string> = config.ruleGuidance || {};
-    if (guidanceFile && fssync.existsSync(guidanceFile)) {
-        try {
-            const guidanceData = JSON.parse(await fs.readFile(guidanceFile, "utf8"));
-            ruleGuidance = {...ruleGuidance, ...(guidanceData.ruleOutputs || guidanceData)};
-            log(`Loaded guidance from ${guidanceFile}`);
-        } catch (err) {
-            logError(`Failed to load guidance file: ${err instanceof Error ? err.message : err}`);
-        }
+    log(`Loading ${files.length} file(s)...`);
+    const changes = await loadFileChanges(files, sessionId);
+
+    if (changes.length === 0) {
+        log("No changes to lint");
+        return;
     }
 
-    log(`Linting ${files.length} file(s)...`);
-    let totalErrs = 0, totalWarns = 0;
-    let filesProcessed = 0;
-    const ruleCounts: Record<string, number> = {};
+    // 3. Run validators
+    log(`Running validators...`);
+    const result = await runValidators(config.validators, changes, sessionId, process.cwd());
 
-    for (const file of files) {
-        filesProcessed++;
-        log(`[${filesProcessed}/${files.length}] Processing: ${file}`);
-        const beforePath = path.join(paths.precache, `${file}.bak`);
-        const hasBefore = fssync.existsSync(beforePath);
-        const afterExists = fssync.existsSync(file);
-        if (!afterExists) {
-            log(`  Skipping (file deleted): ${file}`);
-            continue;
-        }
-
-        const cwd = process.cwd();
-        const virt = virtFromReal(file);
-        const eslint = buildESLint(cwd, file, virt, {noEslintrc, rules: baseRules, typeAware});
-
-        if (hasBefore) {
-            const [before, after] = await Promise.all([fs.readFile(beforePath, "utf8"), fs.readFile(file, "utf8")]);
-            const {ranges, snippet} = computeAdded(before, after);
-            log(`  Found ${ranges.length} changed range(s)`);
-
-            // 1) Try snippet-only lint
-            if (snippet.trim() !== "") {
-                try {
-                    log(`  Attempting snippet-only lint...`);
-                    const res = await eslint.lintText(snippet, {filePath: virt});
-                    const errs = res.reduce((n: number, r) => n + (r.errorCount || 0), 0);
-                    const warns = res.reduce((n: number, r) => n + (r.warningCount || 0), 0);
-                    const hasParsing = res.some((r) => r.messages.some((m) => /Parsing error/i.test(m.message)));
-                    if (!hasParsing && (errs > 0 || warns > 0)) {
-                        log(`  Snippet lint succeeded: ${errs} error(s), ${warns} warning(s)`);
-                        for (const r of res) for (const m of r.messages) {
-                            console.error(`${file}:${m.line ?? 0}:${m.column ?? 0}  ${m.message}  (${m.ruleId ?? "unknown"})`);
-                            const ruleId = m.ruleId ?? "unknown";
-                            ruleCounts[ruleId] = (ruleCounts[ruleId] || 0) + 1;
-                        }
-                        totalErrs += errs; totalWarns += warns;
-                        continue;
-                    }
-                    log(`  Snippet lint had parsing errors or no issues, falling back to full-file lint`);
-                } catch (err) {
-                    log(`  Snippet lint failed: ${err instanceof Error ? err.message : err}, falling back to full-file lint`);
-                }
-            } else {
-                log(`  Snippet is empty, skipping to full-file lint`);
-            }
-
-            // 2) Fallback: full-file lint filtered by changed lines
-            log(`  Running full-file lint (filtered to changed lines)...`);
-            const full = await eslint.lintFiles([file]);
-            let fileErrs = 0, fileWarns = 0;
-            for (const r of full) for (const m of r.messages) {
-                const line = m.line ?? 0;
-                if (line && inRanges(line, ranges)) {
-                    console.error(`${r.filePath}:${line}:${m.column ?? 0}  ${m.message}  (${m.ruleId ?? "unknown"})`);
-                    const ruleId = m.ruleId ?? "unknown";
-                    ruleCounts[ruleId] = (ruleCounts[ruleId] || 0) + 1;
-                    if (m.severity === 2) { totalErrs++; fileErrs++; }
-                    else if (m.severity === 1) { totalWarns++; fileWarns++; }
-                }
-            }
-            log(`  Full-file lint completed: ${fileErrs} error(s), ${fileWarns} warning(s) in changed lines`);
-        } else {
-            // New file: no baseline, lint full file
-            log(`  New file (no pre-cache), linting entire file...`);
-            const res = await eslint.lintFiles([file]);
-            let fileErrs = 0, fileWarns = 0;
-            for (const r of res) for (const m of r.messages) {
-                console.error(`${r.filePath}:${m.line ?? 0}:${m.column ?? 0}  ${m.message}  (${m.ruleId ?? "unknown"})`);
-                const ruleId = m.ruleId ?? "unknown";
-                ruleCounts[ruleId] = (ruleCounts[ruleId] || 0) + 1;
-                if (m.severity === 2) { totalErrs++; fileErrs++; }
-                else if (m.severity === 1) { totalWarns++; fileWarns++; }
-            }
-            log(`  Full-file lint completed: ${fileErrs} error(s), ${fileWarns} warning(s)`);
-        }
+    // 4. Display results
+    for (const msg of result.messages) {
+        console.error(`${msg.file}:${msg.line}:${msg.column}  ${msg.message}  (${msg.ruleId})`);
     }
 
-    // Summary
-    console.error(`\nLinted ${filesProcessed} file(s): ${totalErrs} error(s), ${totalWarns} warning(s)`);
+    // 5. Summary
+    const maxWarnings = flags["max-warnings"] !== undefined ? Number(flags["max-warnings"]) : (config.maxWarnings ?? 0);
+    const clearJournal = flags["clear-journal"] !== undefined ? !!flags["clear-journal"] : (config.clearJournal ?? false);
 
-    // Rule summary with guidance
-    const sortedRules = Object.entries(ruleCounts).sort((a, b) => b[1] - a[1]);
-    if (sortedRules.length > 0) {
-        console.error(`\nRule Summary and Guidance:`);
-        for (const [ruleId, count] of sortedRules) {
-            console.error(`  ${count.toString().padStart(4)}  ${ruleId}`);
-            debugLog(`  ${count.toString().padStart(4)}  ${ruleId}`, sessionId);
+    console.error(`\nLinted ${changes.length} file(s): ${result.errorCount} error(s), ${result.warningCount} warning(s)`);
 
-            if (ruleGuidance[ruleId]) {
-                console.error(`\n${ruleGuidance[ruleId]}\n`);
-                debugLog(`\n${ruleGuidance[ruleId]}\n`, sessionId);
-            }
-        }
-    }
-
-    if (totalErrs > 0) {
-        console.error(`To Claude: Please clean up ${totalErrs} error(s)`);
-        debugLog(`❌ Failed due to ${totalErrs} error(s)`, sessionId);
-    } else if (totalWarns > maxWarnings) {
-        console.error(`To Claude: Please clean up ${totalWarns} warning(s) exceeds max-warnings threshold of ${maxWarnings}`);
-        debugLog(`❌ Failed: ${totalWarns} warning(s) exceeds max-warnings threshold of ${maxWarnings}`, sessionId);
+    // 6. Exit codes
+    if (result.errorCount > 0) {
+        console.error(`To Claude: Please clean up ${result.errorCount} error(s)`);
+        debugLog(`❌ Failed due to ${result.errorCount} error(s)`, sessionId);
+    } else if (result.warningCount > maxWarnings) {
+        console.error(`To Claude: Please clean up ${result.warningCount} warning(s) exceeds max-warnings threshold of ${maxWarnings}`);
+        debugLog(`❌ Failed: ${result.warningCount} warning(s) exceeds max-warnings threshold of ${maxWarnings}`, sessionId);
     } else {
         console.error(`✅ All checks passed`);
         debugLog(`✅ All checks passed`, sessionId);
     }
 
+    // 7. Cleanup
     if (clearJournal) {
         log("Clearing journal and pre-cache...");
         try {
@@ -547,8 +415,8 @@ export async function cmdFinalize(flags: Flags) {
         logError(`Failed to clean up cache directory: ${err instanceof Error ? err.message : err}`);
     }
 
-    if (totalErrs > 0) exit(2);
-    if (totalWarns > maxWarnings) exit(2);
+    if (result.errorCount > 0) exit(2);
+    if (result.warningCount > maxWarnings) exit(2);
 }
 
 (async () => {
