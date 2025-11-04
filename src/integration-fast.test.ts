@@ -50,20 +50,20 @@ describe("Fast CLI Integration Tests", () => {
 
             await cmdRecord({file: testFile});
 
-            const journalPath = `.claude/cache/sessions/${SESSION_ID}/changed/changed_files.txt`;
+            const journalPath = `.claude/.claude-lint/sessions/${SESSION_ID}/changed/changed_files.txt`;
             const content = await fs.readFile(journalPath, "utf8");
             expect(content).toContain(testFile);
         });
 
-        it("should only record web files", async () => {
+        it("should record all files (validators decide what to process)", async () => {
             const mdFile = "readme.md";
             await fs.writeFile(mdFile, "# Test");
 
             await cmdRecord({file: mdFile});
 
-            const journalPath = `.claude/cache/sessions/${SESSION_ID}/changed/changed_files.txt`;
-            const journalExists = fssync.existsSync(journalPath);
-            expect(journalExists).toBe(false);
+            const journalPath = `.claude/.claude-lint/sessions/${SESSION_ID}/changed/changed_files.txt`;
+            const content = await fs.readFile(journalPath, "utf8");
+            expect(content).toContain(mdFile);
         });
     });
 
@@ -75,7 +75,7 @@ describe("Fast CLI Integration Tests", () => {
 
             await cmdPreCache({file: testFile});
 
-            const cachePath = `.claude/cache/sessions/${SESSION_ID}/pre/${testFile}.bak`;
+            const cachePath = `.claude/.claude-lint/sessions/${SESSION_ID}/pre/${testFile}.bak`;
             const cachedContent = await fs.readFile(cachePath, "utf8");
             expect(cachedContent).toBe(content);
         });
@@ -84,25 +84,37 @@ describe("Fast CLI Integration Tests", () => {
     describe("finalize command", () => {
         beforeEach(async () => {
             await fs.writeFile("package.json", JSON.stringify({name: "test", type: "module"}));
+            await fs.mkdir(".claude", {recursive: true});
         });
 
         it("should lint new files and exit with code 2 on errors", async () => {
+            // Create config with regex validator
+            const config = `module.exports = {
+                validators: [{
+                    preset: "regex",
+                    scope: "changes-only",
+                    files: ["**/*.js"],
+                    rules: [{
+                        name: "no-var",
+                        severity: "error",
+                        patterns: ["\\\\bvar\\\\s"],
+                        message: "Use const or let instead of var"
+                    }]
+                }],
+                maxWarnings: 0
+            };`;
+            await fs.writeFile(".claude/lint-config.js", config);
+
             const testFile = "test.js";
             await fs.writeFile(testFile, "var x = 1;\n");
             await cmdRecord({file: testFile});
 
             await expect(async () => {
-                await cmdFinalize({
-                    "no-eslintrc": true,
-                    rules: "no-var:error",
-                });
+                await cmdFinalize({});
             }).rejects.toThrow(ExitCodeError);
 
             try {
-                await cmdFinalize({
-                    "no-eslintrc": true,
-                    rules: "no-var:error",
-                });
+                await cmdFinalize({});
             } catch (err) {
                 expect(err).toBeInstanceOf(ExitCodeError);
                 expect((err as ExitCodeError).code).toBe(2);
@@ -110,17 +122,46 @@ describe("Fast CLI Integration Tests", () => {
         });
 
         it("should pass when no violations", async () => {
+            const config = `module.exports = {
+                validators: [{
+                    preset: "regex",
+                    scope: "changes-only",
+                    files: ["**/*.js"],
+                    rules: [{
+                        name: "no-var",
+                        severity: "error",
+                        patterns: ["\\\\bvar\\\\s"],
+                        message: "Use const or let instead of var"
+                    }]
+                }],
+                maxWarnings: 0
+            };`;
+            await fs.writeFile(".claude/lint-config.js", config);
+
             const testFile = "test.js";
             await fs.writeFile(testFile, "const x = 1;\n");
             await cmdRecord({file: testFile});
 
-            await cmdFinalize({
-                "no-eslintrc": true,
-                rules: "no-var:error",
-            });
+            await cmdFinalize({});
         });
 
         it("should only lint changed lines when pre-cache exists", async () => {
+            const config = `module.exports = {
+                validators: [{
+                    preset: "regex",
+                    scope: "changes-only",
+                    files: ["**/*.js"],
+                    rules: [{
+                        name: "no-var",
+                        severity: "error",
+                        patterns: ["\\\\bvar\\\\s"],
+                        message: "Use const or let instead of var"
+                    }]
+                }],
+                maxWarnings: 0
+            };`;
+            await fs.writeFile(".claude/lint-config.js", config);
+
             const testFile = "test.js";
             const before = "const x = 1;\n";
             const after = "const x = 1;\nvar y = 2;\n";
@@ -132,10 +173,7 @@ describe("Fast CLI Integration Tests", () => {
             await cmdRecord({file: testFile});
 
             await expect(async () => {
-                await cmdFinalize({
-                    "no-eslintrc": true,
-                    rules: "no-var:error",
-                });
+                await cmdFinalize({});
             }).rejects.toThrow(ExitCodeError);
         });
     });
