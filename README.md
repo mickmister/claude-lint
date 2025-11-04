@@ -18,6 +18,33 @@ npx claude-lint init --customize
 
 which will create `.claude/lint-config.mjs` where you can extend or override default validators.
 
+## Global Configuration
+
+You can configure `claude-lint` globally by running `init` in your home directory:
+
+```bash
+cd ~
+npx claude-lint init
+```
+
+This adds hooks to `~/.claude/settings.json` that will run for all Claude Code sessions.
+
+### Current Limitation
+
+**At this time, global and project-level configurations cannot be used simultaneously on the same computer.** If you have global hooks configured, they will run for all projects, even those with their own `.claude/settings.json`.
+
+You must choose one approach:
+- **Global only**: Configure in `~/.claude/settings.json` for all projects
+- **Per-project only**: Configure in each project's `.claude/settings.json`
+
+### Future Enhancement
+
+A future version will support automatic precedence handling where:
+- Global config serves as a default for all projects
+- Project-specific config automatically overrides global when present
+
+This will allow you to set global defaults once and override per-project as needed.
+
 ## Default Rules
 
 The default configuration includes 4 validators focused on TypeScript development best practices:
