@@ -1,0 +1,74 @@
+{
+  "name": "claude-lint",
+  "version": "0.2.7",
+  "description": "Give Claude custom actionable feedback for addressing unwanted development practices. Define what patterns you don't want to see in Claude's code output, and pair it up with specific instructions to address the issues.",
+  "author": {
+    "name": "claude-lint contributors",
+    "url": "https://github.com/mickmister/claude-lint"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mickmister/claude-lint"
+  },
+  "license": "MIT",
+  "keywords": [
+    "linting",
+    "code-quality",
+    "typescript",
+    "javascript",
+    "hooks",
+    "validation"
+  ],
+  "engines": {
+    "node": ">=18.18"
+  },
+  "hooks": {
+    "install": "node dist/plugin-install.js",
+    "uninstall": "node dist/plugin-uninstall.js",
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "npx claude-lint pre-cache",
+            "description": "Cache file before changes"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "npx claude-lint record",
+            "description": "Journal changed file"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "npx claude-lint finalize",
+            "description": "Validate all changes and provide feedback"
+          }
+        ]
+      }
+    ]
+  },
+  "main": "dist/index.js",
+  "bin": {
+    "claude-lint": "dist/cli.js"
+  },
+  "files": [
+    "dist/**/*",
+    "plugin.json",
+    "README.md",
+    "LICENSE"
+  ]
+}

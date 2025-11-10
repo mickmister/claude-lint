@@ -2,7 +2,19 @@
 
 Give Claude custom actionable feedback for addressing unwanted development practices. Define what patterns you don't want to see in Claude's code output, and pair it up with specific instructions to address the issues.
 
-## Quick Start
+## Installation
+
+### Option 1: Claude Code Plugin (Recommended)
+
+Install directly from the Claude Code plugin marketplace:
+
+```bash
+/plugin install mickmister/claude-lint
+```
+
+The plugin will automatically set up hooks in your `.claude/settings.json` with default configuration.
+
+### Option 2: NPX Quick Start
 
 ```bash
 npx claude-lint init
@@ -44,6 +56,22 @@ A future version will support automatic precedence handling where:
 - Project-specific config automatically overrides global when present
 
 This will allow you to set global defaults once and override per-project as needed.
+
+## Uninstallation
+
+### Plugin Installation
+
+To uninstall the plugin:
+
+```bash
+/plugin uninstall claude-lint
+```
+
+This will remove the hooks from `.claude/settings.json` and clear the cache directory. Your custom configuration file (`.claude/lint-config.mjs`) will be preserved.
+
+### NPX Installation
+
+If you installed via NPX, manually remove the hooks from `.claude/settings.json` and delete the `.claude/lint-config.mjs` file if desired.
 
 ## Default Rules
 

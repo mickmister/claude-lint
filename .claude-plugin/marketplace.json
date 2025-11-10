@@ -1,0 +1,34 @@
+{
+  "name": "claude-lint-marketplace",
+  "owner": {
+    "name": "claude-lint contributors",
+    "email": "contact@example.com"
+  },
+  "plugins": [
+    {
+      "name": "claude-lint",
+      "source": ".",
+      "description": "Give Claude custom actionable feedback for addressing unwanted development practices. Define what patterns you don't want to see in Claude's code output, and pair it up with specific instructions to address the issues.",
+      "version": "0.2.7",
+      "author": {
+        "name": "claude-lint contributors",
+        "url": "https://github.com/mickmister/claude-lint"
+      },
+      "keywords": [
+        "linting",
+        "code-quality",
+        "typescript",
+        "javascript",
+        "hooks",
+        "validation"
+      ],
+      "category": "Code Quality",
+      "tags": [
+        "linting",
+        "validation",
+        "hooks",
+        "typescript"
+      ]
+    }
+  ]
+}

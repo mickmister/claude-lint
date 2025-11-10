@@ -19,12 +19,14 @@
     "claude-lint": "dist/cli.js"
   },
   "files": [
-    "dist"
+    "dist",
+    "plugin.json",
+    "README.md"
   ],
   "scripts": {
     "dev": "tsx src/cli.ts",
     "build": "tsc -p tsconfig.json",
-    "prepare": "pnpm run build && pnpm test",
+    "prepare": "pnpm run build",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:ui": "vitest --ui",
