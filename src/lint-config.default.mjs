@@ -177,8 +177,8 @@ export function markdownOrganizationValidator(options = {}) {
     "**/README.MD",
     "**/readme.md",
     "**/readme.MD",
-    "claude_notes/*-*.md",
-    "claude_notes/*-*.MD"
+    "claude_notes/\\d+-.*\\.md",
+    "claude_notes/\\d+-.*\\.MD"
   ];
 
   return {
