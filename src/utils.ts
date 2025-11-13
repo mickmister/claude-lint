@@ -54,7 +54,7 @@ export function inRanges(line: number, ranges: Range[]): boolean {
 }
 
 export function matchesGlob(file: string, patterns: string[]): boolean {
-  return patterns.some(pattern => minimatch(file, pattern));
+  return patterns.some(pattern => minimatch(file, pattern, { dot: true }));
 }
 
 export function uniq<T>(xs: T[]): T[] {
