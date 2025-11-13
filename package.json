@@ -1,6 +1,6 @@
 {
   "name": "claude-lint",
-  "version": "0.2.7",
+  "version": "0.2.9",
   "description": "Claude Code hooks helper: journal changed files and provide detailed custom feedback when it's finished with its task.",
   "type": "module",
   "main": "dist/index.js",

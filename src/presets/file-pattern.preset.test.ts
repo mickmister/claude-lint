@@ -356,4 +356,273 @@ describe('filePatternValidator', () => {
     expect(result.messages).toHaveLength(1);
     expect(result.messages[0].message).toBe('No markdown files allowed');
   });
+
+  describe('restrictedFilesValidator', () => {
+    it('should block .env files', async () => {
+      const changes: FileChange[] = [
+        {
+          filePath: '.env',
+          after: 'SECRET_KEY=abc123',
+          ranges: [],
+          snippet: ''
+        },
+        {
+          filePath: '.env.local',
+          after: 'SECRET_KEY=xyz789',
+          ranges: [],
+          snippet: ''
+        }
+      ];
+
+      const restrictedPatterns = [
+        '**/.env',
+        '**/.env.*'
+      ];
+
+      const context: PresetContext = {
+        changes,
+        config: {
+          preset: 'file-pattern',
+          scope: 'whole-file',
+          files: restrictedPatterns,
+          rules: [{
+            name: 'restricted-files',
+            patterns: restrictedPatterns,
+            allowed: [],
+            message: 'Cannot edit restricted files that may contain secrets'
+          }]
+        },
+        sessionId: 'test',
+        cwd: process.cwd()
+      };
+
+      const result = await filePatternValidator(context);
+
+      expect(result.messages).toHaveLength(2);
+      expect(result.messages[0].file).toBe('.env');
+      expect(result.messages[1].file).toBe('.env.local');
+      expect(result.errorCount).toBe(2);
+    });
+
+    it('should block private key files', async () => {
+      const changes: FileChange[] = [
+        {
+          filePath: 'certs/private.key',
+          after: '-----BEGIN PRIVATE KEY-----',
+          ranges: [],
+          snippet: ''
+        },
+        {
+          filePath: 'ssl/server.pem',
+          after: '-----BEGIN CERTIFICATE-----',
+          ranges: [],
+          snippet: ''
+        }
+      ];
+
+      const restrictedPatterns = [
+        '**/*.key',
+        '**/*.pem'
+      ];
+
+      const context: PresetContext = {
+        changes,
+        config: {
+          preset: 'file-pattern',
+          scope: 'whole-file',
+          files: restrictedPatterns,
+          rules: [{
+            name: 'restricted-files',
+            patterns: restrictedPatterns,
+            allowed: [],
+            message: 'Cannot edit private key files'
+          }]
+        },
+        sessionId: 'test',
+        cwd: process.cwd()
+      };
+
+      const result = await filePatternValidator(context);
+
+      expect(result.messages).toHaveLength(2);
+      expect(result.errorCount).toBe(2);
+    });
+
+    it('should block SSH key files', async () => {
+      const changes: FileChange[] = [
+        {
+          filePath: '.ssh/id_rsa',
+          after: '-----BEGIN RSA PRIVATE KEY-----',
+          ranges: [],
+          snippet: ''
+        },
+        {
+          filePath: 'keys/deploy_ed25519',
+          after: '-----BEGIN OPENSSH PRIVATE KEY-----',
+          ranges: [],
+          snippet: ''
+        }
+      ];
+
+      const restrictedPatterns = [
+        '**/*_rsa',
+        '**/*_ed25519'
+      ];
+
+      const context: PresetContext = {
+        changes,
+        config: {
+          preset: 'file-pattern',
+          scope: 'whole-file',
+          files: restrictedPatterns,
+          rules: [{
+            name: 'restricted-files',
+            patterns: restrictedPatterns,
+            allowed: [],
+            message: 'Cannot edit SSH key files'
+          }]
+        },
+        sessionId: 'test',
+        cwd: process.cwd()
+      };
+
+      const result = await filePatternValidator(context);
+
+      expect(result.messages).toHaveLength(2);
+      expect(result.errorCount).toBe(2);
+    });
+
+    it('should allow files in the allowed list', async () => {
+      const changes: FileChange[] = [
+        {
+          filePath: 'example.env',
+          after: 'EXAMPLE_VAR=example',
+          ranges: [],
+          snippet: ''
+        },
+        {
+          filePath: '.env',
+          after: 'SECRET_KEY=abc123',
+          ranges: [],
+          snippet: ''
+        }
+      ];
+
+      const restrictedPatterns = [
+        '**/.env',
+        '**/*.env'
+      ];
+
+      const context: PresetContext = {
+        changes,
+        config: {
+          preset: 'file-pattern',
+          scope: 'whole-file',
+          files: restrictedPatterns,
+          rules: [{
+            name: 'restricted-files',
+            patterns: restrictedPatterns,
+            allowed: ['example.env'],
+            message: 'Cannot edit restricted files'
+          }]
+        },
+        sessionId: 'test',
+        cwd: process.cwd()
+      };
+
+      const result = await filePatternValidator(context);
+
+      expect(result.messages).toHaveLength(1);
+      expect(result.messages[0].file).toBe('.env');
+    });
+
+    it('should block credential files', async () => {
+      const changes: FileChange[] = [
+        {
+          filePath: 'config/credentials.json',
+          after: '{"api_key": "secret"}',
+          ranges: [],
+          snippet: ''
+        },
+        {
+          filePath: 'secrets.json',
+          after: '{"password": "secret"}',
+          ranges: [],
+          snippet: ''
+        }
+      ];
+
+      const restrictedPatterns = [
+        '**/credentials.json',
+        '**/secrets.json'
+      ];
+
+      const context: PresetContext = {
+        changes,
+        config: {
+          preset: 'file-pattern',
+          scope: 'whole-file',
+          files: restrictedPatterns,
+          rules: [{
+            name: 'restricted-files',
+            patterns: restrictedPatterns,
+            allowed: [],
+            message: 'Cannot edit credential files'
+          }]
+        },
+        sessionId: 'test',
+        cwd: process.cwd()
+      };
+
+      const result = await filePatternValidator(context);
+
+      expect(result.messages).toHaveLength(2);
+      expect(result.errorCount).toBe(2);
+    });
+
+    it('should not block non-sensitive files', async () => {
+      const changes: FileChange[] = [
+        {
+          filePath: 'src/config.ts',
+          after: 'export const config = {}',
+          ranges: [],
+          snippet: ''
+        },
+        {
+          filePath: 'README.md',
+          after: '# README',
+          ranges: [],
+          snippet: ''
+        }
+      ];
+
+      const restrictedPatterns = [
+        '**/.env',
+        '**/*.key',
+        '**/*.pem'
+      ];
+
+      const context: PresetContext = {
+        changes,
+        config: {
+          preset: 'file-pattern',
+          scope: 'whole-file',
+          files: restrictedPatterns,
+          rules: [{
+            name: 'restricted-files',
+            patterns: restrictedPatterns,
+            allowed: [],
+            message: 'Cannot edit restricted files'
+          }]
+        },
+        sessionId: 'test',
+        cwd: process.cwd()
+      };
+
+      const result = await filePatternValidator(context);
+
+      expect(result.messages).toHaveLength(0);
+      expect(result.errorCount).toBe(0);
+    });
+  });
 });

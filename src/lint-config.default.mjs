@@ -200,10 +200,59 @@ export function markdownOrganizationValidator(options = {}) {
   };
 }
 
+export function restrictedFilesValidator(options = {}) {
+  const restrictedPatterns = options.restrictedPatterns || [
+    "**/.env",
+    "**/.env.*",
+    "**/*.key",
+    "**/*.pem",
+    "**/*.p12",
+    "**/*.pfx",
+    "**/credentials.json",
+    "**/secrets.json",
+    "**/*_rsa",
+    "**/*_dsa",
+    "**/*_ecdsa",
+    "**/*_ed25519",
+    "**/.npmrc",
+    "**/.pypirc"
+  ];
+
+  const allowed = options.allowed || [];
+
+  return {
+    preset: "file-pattern",
+    scope: "whole-file",
+    files: restrictedPatterns,
+    rules: [
+      {
+        name: "restricted-files",
+        patterns: restrictedPatterns,
+        allowed,
+        message: options.message || `Cannot edit/write to restricted files that may contain secrets.
+
+Restricted file patterns include:
+- .env, .env.* (environment variables with secrets)
+- *.key, *.pem, *.p12, *.pfx (private keys and certificates)
+- credentials.json, secrets.json (credential files)
+- SSH keys (*_rsa, *_dsa, *_ecdsa, *_ed25519)
+- Package manager configs (.npmrc, .pypirc)
+
+→ If you need to add this file to the allowed list, configure it in your lint config:
+  restrictedFilesValidator({ allowed: ["path/to/allowed/file.env"] })
+
+Note: This prevents WRITES to sensitive files. To prevent READS, configure Claude Code settings.`
+      }
+    ]
+  };
+}
+
 export const extraValidators = [
   noEmojisValidator(),
   noCommentsValidator(),
   noCommentsValidatorBash(),
+  restrictedFilesValidator(),
+  markdownOrganizationValidator(),
 ];
 
 export default defineLintConfig({
@@ -211,6 +260,5 @@ export default defineLintConfig({
     noTodosValidator(),
     noExplicitAnyValidator(),
     noManualPackageJsonValidator(),
-    markdownOrganizationValidator(),
   ],
 });

@@ -1,6 +1,23 @@
 import type { PresetFunction, LintMessage } from '../types.js';
 import { matchesGlob } from '../utils.js';
 
+/**
+ * File pattern validator preset
+ *
+ * This preset validates files based on glob patterns and can be used for:
+ * 1. Restricting file locations (e.g., markdown files must be in specific folders)
+ * 2. Blocking edits to sensitive files (e.g., .env, credentials, private keys)
+ * 3. Enforcing file organization rules
+ *
+ * How it works:
+ * - Checks if a file matches any of the rule's patterns
+ * - If it matches, checks if the file is in the allowed list
+ * - If not allowed, reports an error
+ *
+ * Example use cases:
+ * - markdownOrganizationValidator: Ensures markdown files follow naming conventions
+ * - restrictedFilesValidator: Blocks edits to files containing secrets
+ */
 export const filePatternValidator: PresetFunction = async (context) => {
   const { changes, config } = context;
   const messages: LintMessage[] = [];
